@@ -2,14 +2,13 @@ from django.conf import settings
 from django.contrib.messages import get_messages
 from django.http import HttpRequest, HttpResponse, QueryDict
 from django.template.loader import render_to_string
-from django.utils.translation import gettext_lazy as _
 
 from django_htmx.http import HttpResponseClientRedirect
 
 
-# TODO: PUSH: Make sure CSRF Protection is enabled for hx-put, hx-patch, and hx-delete
+# TODO: PUSH: Make sure CSRF Protection is enabled for hx-put, patch, delete
 # TODO: Add note to README about keeping HTMX default for DELETE
-# TODO: https://github.com/bigskysoftware/htmx/issues/497#issuecomment-2406237261
+# https://github.com/bigskysoftware/htmx/issues/497#issuecomment-2406237261
 class HtmxVaryMiddleware:
   """Sets the 'Vary' header to avoid improper caching.
 
@@ -58,7 +57,7 @@ class HttpVerbViewMiddleware:
         request.BODY = QueryDict(request.body)
 
     if not request.htmx:
-      if _method := (request.POST.get('_method') or request.GET.get('_method')):
+      if _method := (request.POST.get('_method') or request.GET.get('_method')):  # noqa: E501
         request.method = _method.upper()
 
 
@@ -95,7 +94,8 @@ class HtmxPartialTemplateMiddleware:
     return response
 
 
-# TODO: Consider ditching: https://github.com/bblanchon/django-htmx-messages-framework/
+# https://github.com/bblanchon/django-htmx-messages-framework/
+# https://github.com/abe-101/django-htmx-messages
 class HtmxMessageMiddleware:
   """Middleware to add HTMX support to messages framework.
 
@@ -117,7 +117,11 @@ class HtmxMessageMiddleware:
 
   """
 
-  messages_template = getattr(settings, 'MESSAGES_TEMPLATE_NAME', 'messages.html')
+  messages_template = getattr(
+    settings,
+    'MESSAGES_TEMPLATE_NAME',
+    'messages.html',
+  )
 
   def __init__(self, get_response) -> None:
     self.get_response = get_response

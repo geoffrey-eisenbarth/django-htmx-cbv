@@ -3,8 +3,7 @@ from urllib.parse import urlencode
 from bs4 import BeautifulSoup
 from parameterized import parameterized
 
-from django.contrib import messages
-from django.http import HttpRequest, HttpResponse, QueryDict
+from django.http import HttpResponse, QueryDict
 from django.test import Client, TestCase
 from django.urls import reverse
 
@@ -184,7 +183,7 @@ class HtmxMessageMiddlewareTest(SoupTestCase):
     response = self.client.get(
       path=response.headers['HX-Redirect'],
       # TODO: When htmx does HX-Redirect, does it send headers?
-      #headers={'HX-Request': 'true'},
+      # headers={'HX-Request': 'true'},
     )
     soup = self.get_soup(response)
     self.assertIsNotNone(soup.html)
