@@ -1,0 +1,41 @@
+[project]
+name = "django-htmx-cbvs"
+version = "0.0.1.dev1"
+description = "Django class-based views, tailored for htmx"
+authors = [
+    {name = "Geoffrey Eisenbarth",email = "geoffrey.eisenbarth@gmail.com"}
+]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "django (>=5.1.7,<6.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.5"
+pytest-django = "^4.10.0"
+coverage = "^7.7.0"
+flake8 = "^7.1.2"
+codecov = "^2.1.13"
+mypy = "^1.15.0"
+django-stubs = "^5.1.3"
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "project.settings"
+
+[tool.coverage.report]
+show_missing = true
+
+[tool.mypy]
+python_version = "3.9"
+plugins = ["mypy_django_plugin.main"]
+ignore_missing_imports = true
+
+[tool.django-stubs]
+django_settings_module = "tests.project.project.settings"
