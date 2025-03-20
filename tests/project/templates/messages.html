@@ -1,0 +1,8 @@
+<output id="messages" aria-label="Messages" hx-swap-oob="outerHTML">
+  {% if messages %}
+  <ul>
+  {% for message in messages %}
+  <li class="{{ message.tags }}">{{ message|safe }}
+  {% endfor %}
+  </ul>{% endif %}
+</output>
