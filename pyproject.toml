@@ -1,5 +1,5 @@
 [project]
-name = "django-htmx-cbvs"
+name = "django-htmx-cbv"
 version = "0.0.1.dev1"
 description = "Django class-based views, tailored for htmx"
 authors = [
