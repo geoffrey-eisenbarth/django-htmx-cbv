@@ -1,0 +1,21 @@
+{% load partials %}
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>My Webpage</title>
+  </head>
+  <body>
+    {% include "messages.html" %}
+    {% partialdef main %}
+    <main>
+      <h1>My Webpage</h1>
+      {% partialdef text %}
+      <p id="text">This is text
+      {% endpartialdef text %}
+    </main>
+    {% endpartialdef main %}
+  </body>
+</html>

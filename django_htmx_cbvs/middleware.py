@@ -1,12 +1,34 @@
+from django.conf import settings
 from django.contrib.messages import get_messages
 from django.http import HttpRequest, HttpResponse, QueryDict
 from django.template.loader import render_to_string
+from django.utils.translation import gettext_lazy as _
 
-# TODO: Remove django_htmx requirement? grep for request\.htmx
 from django_htmx.http import HttpResponseClientRedirect
 
 
-# TODO PUSH: Make sure CSRF Protection is enabled for hx-put, hx-patch, and hx-delete
+# TODO: PUSH: Make sure CSRF Protection is enabled for hx-put, hx-patch, and hx-delete
+# TODO: Add note to README about keeping HTMX default for DELETE
+# TODO: https://github.com/bigskysoftware/htmx/issues/497#issuecomment-2406237261
+class HtmxVaryMiddleware:
+  """Sets the 'Vary' header to avoid improper caching.
+
+  Notes
+  -----
+  See https://htmx.org/docs/#caching
+
+  """
+
+  def __init__(self, get_response) -> None:
+    self.get_response = get_response
+
+  def __call__(self, request: HttpRequest) -> HttpResponse:
+    response = self.get_response(request)
+    if request.htmx:
+      response['Vary'] = 'HX-Request'
+    return response
+
+
 class HttpVerbViewMiddleware:
   """Adds support for all HTTP verbs.
 
@@ -27,7 +49,14 @@ class HttpVerbViewMiddleware:
 
   def process_view(self, request, view_func, view_args, view_kwargs):
     request.QUERY = request.GET.copy()
-    request.BODY = request.POST.copy() or QueryDict(request.body)
+    if request.method in ['GET', 'DELETE']:
+      request.BODY = QueryDict()
+    elif request.method == 'POST':
+      request.BODY = request.POST.copy()
+    elif request.method in ['PUT', 'PATCH']:
+      if request.content_type == 'application/x-www-form-urlencoded':
+        request.BODY = QueryDict(request.body)
+
     if not request.htmx:
       if _method := (request.POST.get('_method') or request.GET.get('_method')):
         request.method = _method.upper()
@@ -36,7 +65,7 @@ class HttpVerbViewMiddleware:
 class HtmxPartialTemplateMiddleware:
   """Adds support for rendering partials."""
 
-  DEFAULT_PARTIAL_NAME = 'main'
+  default_partial_name = getattr(settings, 'DEFAULT_PARTIAL_NAME', 'main')
 
   def __init__(self, get_response) -> None:
     self.get_response = get_response
@@ -52,9 +81,10 @@ class HtmxPartialTemplateMiddleware:
       if retarget_id := response.get('HX-Retarget'):
         partial_name = retarget_id.strip('#')
       elif partial_name := response.get('HX-Partial-Name'):
+        # Allow the view to specify the partial name
         pass
       else:
-        partial_name = request.htmx.target or self.DEFAULT_PARTIAL_NAME
+        partial_name = request.htmx.target or self.default_partial_name
 
       response.template_name = [
         f'{template_name}#{partial_name}'
@@ -65,25 +95,7 @@ class HtmxPartialTemplateMiddleware:
     return response
 
 
-class HtmxVaryMiddleware:
-  """Sets the 'Vary' header to avoid improper caching.
-
-  Notes
-  -----
-  See https://htmx.org/docs/#caching
-
-  """
-
-  def __init__(self, get_response) -> None:
-    self.get_response = get_response
-
-  def __call__(self, request: HttpRequest) -> HttpResponse:
-    response = self.get_response(request)
-    if request.htmx:
-      response['Vary'] = 'HX-Request'
-    return response
-
-
+# TODO: Consider ditching: https://github.com/bblanchon/django-htmx-messages-framework/
 class HtmxMessageMiddleware:
   """Middleware to add HTMX support to messages framework.
 
@@ -105,6 +117,8 @@ class HtmxMessageMiddleware:
 
   """
 
+  messages_template = getattr(settings, 'MESSAGES_TEMPLATE_NAME', 'messages.html')
+
   def __init__(self, get_response) -> None:
     self.get_response = get_response
 
@@ -112,20 +126,20 @@ class HtmxMessageMiddleware:
 
     response = self.get_response(request)
 
-    if 'HX-Request' not in request.headers:
+    if 'HX-Redirect' in response.headers:
+      # Ignore client-side redirection because HTMX drops OOB swabs
+      return response
+    elif 'HX-Request' not in request.headers:
       # Not an HTMX request, so full page rendering will pick up the message
       return response
     elif 300 <= response.status_code < 400:
       # Ignore redirections because HTMX cannot read the body
       return response
-    elif 'HX-Redirect' in response.headers:
-      # Ignore client-side redirection because HTMX drops OOB swabs
-      return response
 
     # Add message HTML
     if messages := get_messages(request):
       html = render_to_string(
-        template_name="messages.html",
+        template_name=self.messages_template,
         context={'messages': messages},
         request=request,
       )
