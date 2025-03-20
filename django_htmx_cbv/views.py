@@ -223,7 +223,9 @@ class ModelFormView(
     if (self.request.method == 'PATCH'):
       # PATCH should use ManyToManyField.add() instead of ManyToManyField.set()
       for f in self.object._meta.many_to_many:
-        f.save_form_data = lambda instance, data: getattr(instance, f.attname).add(*data)
+        f.save_form_data = lambda instance, data: (
+          getattr(instance, f.attname).add(*data)
+        )
     return super().form_valid(form)
 
   def delete(self, request: HttpRequest, *args, **kwargs) -> HttpResponse:
@@ -242,7 +244,10 @@ class ModelFormView(
       if isinstance(self.object._meta.get_field(name), ManyToManyField):
         # Remove from ManyToMany relation, no need to save object afterwards
         getattr(self.object, name).remove(*request.QUERY.getlist(name))
-      elif (related_obj := getattr(self.object, name)) and (requested_pk := request.QUERY.get(name)):
+      elif (
+        (related_obj := getattr(self.object, name)) and
+        (requested_pk := request.QUERY.get(name))
+      ):
         # ForeignKey or OneToOneField, must save object
         if related_obj.pk == requested_pk:
           setattr(self.object, name, None)
