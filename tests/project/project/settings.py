@@ -52,11 +52,11 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 
-    'django_htmx_cbvs.middleware.HtmxPartialTemplateMiddleware',
+    'django_htmx_cbv.middleware.HtmxPartialTemplateMiddleware',
     'django_htmx.middleware.HtmxMiddleware',               # TODO: Does this need to be after HtmxPartialTemplateMiddleware?
-    'django_htmx_cbvs.middleware.HtmxVaryMiddleware',
-    'django_htmx_cbvs.middleware.HtmxMessageMiddleware',   # Must come after MessageMiddleware
-    'django_htmx_cbvs.middleware.HttpVerbViewMiddleware',  # Must come after CsrfViewMiddleware
+    'django_htmx_cbv.middleware.HtmxVaryMiddleware',
+    'django_htmx_cbv.middleware.HtmxMessageMiddleware',   # Must come after MessageMiddleware
+    'django_htmx_cbv.middleware.HttpVerbViewMiddleware',  # Must come after CsrfViewMiddleware
 ]
 
 ROOT_URLCONF = 'project.urls'
