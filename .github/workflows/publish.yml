@@ -9,8 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
-        django-version: ["~=3.2.0", "~=4.2.0", "~=5.0.0"]
+        python-version: ["3.14"]
+        django-version: ["~=6.0.0"]
 
     steps:
       - name: Checkout code
@@ -30,6 +30,9 @@ jobs:
       - name: Lint with flake8
         run: poetry run flake8 .
 
+      - name: Check types with mypy
+        run: poetry run mypy
+
       - name: Run tests
         run: |
           poetry run coverage run tests/project/manage.py test
@@ -39,7 +42,7 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           files: .coverage.xml
-          name: codecov-django-ctct
+          name: codecov-django-htmx-cbv
           token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Build and publish to TestPyPI

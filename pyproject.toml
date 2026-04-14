@@ -26,7 +26,8 @@ dev = [
     "pytest-django (>=4.12.0,<5.0.0)",
     "codecov (>=2.1.13,<3.0.0)",
     "parameterized (>=0.9.0,<0.10.0)",
-    "beautifulsoup4 (>=4.14.3,<5.0.0)"
+    "beautifulsoup4 (>=4.14.3,<5.0.0)",
+    "pre-commit (>=4.5.1,<5.0.0)"
 ]
 
 
