@@ -3,17 +3,24 @@ from urllib.parse import urlencode
 from bs4 import BeautifulSoup
 from parameterized import parameterized
 
+from django.core.checks import run_checks
 from django.http import HttpResponse, QueryDict
-from django.test import Client, TestCase
+from django.test import Client, RequestFactory, TestCase, override_settings
+from django.test.client import BOUNDARY, MULTIPART_CONTENT, encode_multipart
 from django.urls import reverse
+from django.core.files.uploadedfile import SimpleUploadedFile
 
 from django_htmx.http import HttpResponseClientRedirect
+from django_htmx.middleware import HtmxDetails
+
+from django_htmx_cbv.middleware import HttpVerbViewMiddleware
 
 
 class HttpVerbViewMiddlewareTest(TestCase):
 
   def setUp(self) -> None:
     self.client = Client()
+    self.factory = RequestFactory()
 
   def tearDown(self) -> None:
     pass
@@ -65,6 +72,35 @@ class HttpVerbViewMiddlewareTest(TestCase):
     request = response.wsgi_request
 
     self.assertEqual(request.method, _method)
+
+  @parameterized.expand([
+    ('PATCH'),
+    ('PUT'),
+  ])
+  def test_multipart_body_and_files(self, method: str) -> None:
+    upload = SimpleUploadedFile(
+      'hello.txt',
+      b'hello world',
+      content_type='text/plain',
+    )
+    body = encode_multipart(BOUNDARY, {
+      'name': 'example',
+      'upload': upload,
+    })
+    request = self.factory.generic(
+      method,
+      reverse('page'),
+      data=body,
+      content_type=MULTIPART_CONTENT,
+    )
+    request.htmx = HtmxDetails(request)
+
+    middleware = HttpVerbViewMiddleware(lambda req: HttpResponse())
+    middleware.process_view(request, lambda req: HttpResponse(), (), {})
+
+    self.assertEqual(request.BODY, QueryDict('name=example'))
+    self.assertIn('upload', request.FILES)
+    self.assertEqual(request.FILES['upload'].name, 'hello.txt')
 
 
 class HtmxVaryMiddlewareTest(TestCase):
@@ -197,3 +233,24 @@ class HtmxMessageMiddlewareTest(SoupTestCase):
     self.assertEqual(response.status_code, 200)
     soup = self.get_soup(response)
     self.assertIsNotNone(soup.find('li', class_='success'))
+
+
+class MiddlewareChecksTest(TestCase):
+  @override_settings(MIDDLEWARE=[
+    'django_htmx_cbv.middleware.HtmxPartialTemplateMiddleware',
+  ])
+  def test_missing_htmx_middleware_check(self) -> None:
+    errors = run_checks()
+    self.assertTrue(
+      any(error.id == 'django_htmx_cbv.E001' for error in errors)
+    )
+
+  @override_settings(MIDDLEWARE=[
+    'django_htmx_cbv.middleware.HtmxPartialTemplateMiddleware',
+    'django_htmx.middleware.HtmxMiddleware',
+  ])
+  def test_misordered_htmx_middleware_check(self) -> None:
+    errors = run_checks()
+    self.assertTrue(
+      any(error.id == 'django_htmx_cbv.E002' for error in errors)
+    )
