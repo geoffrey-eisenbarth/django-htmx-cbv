@@ -54,6 +54,7 @@ exclude = [
   "future.py",
   "tests/project/",
 ]
+files = ["django_htmx_cbv/"]
 
 [tool.django-stubs]
 django_settings_module = "project.settings"
