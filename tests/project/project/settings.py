@@ -38,8 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
-    'template_partials',
-
+    'django_htmx_cbv',
     'app',
 ]
 
@@ -52,8 +51,8 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 
+    'django_htmx.middleware.HtmxMiddleware',
     'django_htmx_cbv.middleware.HtmxPartialTemplateMiddleware',
-    'django_htmx.middleware.HtmxMiddleware',               # TODO: Does this need to be after HtmxPartialTemplateMiddleware?
     'django_htmx_cbv.middleware.HtmxVaryMiddleware',
     'django_htmx_cbv.middleware.HtmxMessageMiddleware',   # Must come after MessageMiddleware
     'django_htmx_cbv.middleware.HttpVerbViewMiddleware',  # Must come after CsrfViewMiddleware
