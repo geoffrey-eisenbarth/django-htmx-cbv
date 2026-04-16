@@ -45,16 +45,14 @@ show_missing = true
 [tool.mypy]
 python_version = "3.14"
 plugins = ["mypy_django_plugin.main"]
-mypy_path = ["tests/project"]
-ignore_missing_imports = true
 strict = true
+ignore_missing_imports = true
+packages = ["django_htmx_cbv", "tests"]
 exclude = [
-  "manage.py",
-  "settings.py",
   "future.py",
-  "tests/project/",
+  "tests/project/manage.py",
+  "tests/project/project",
 ]
-files = ["django_htmx_cbv/"]
 
 [tool.django-stubs]
-django_settings_module = "project.settings"
+django_settings_module = "tests.project.project.settings"

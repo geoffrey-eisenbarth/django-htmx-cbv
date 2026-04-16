@@ -278,7 +278,7 @@ class SingleObjectPermissionMixin[_M: Model](SingleObjectMixin[_M]):
   def has_permission(
     self,
     request: HttpRequest,
-    obj: Model | None,
+    obj: _M | None,
   ) -> bool:
     message = (
       "SingleObjectPermissionMixin requires that subclasses define a "
