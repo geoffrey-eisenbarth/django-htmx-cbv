@@ -248,6 +248,7 @@ class ProcessHyperFormView[_F: forms.BaseForm](HyperFormMixin[_F], View):
     raise ImproperlyConfigured(message)
 
 
+# TODO: What's the point if all the functionality is in ProcessHyperFormView?
 class HyperFormView[_F: forms.BaseForm](ProcessHyperFormView[_F]):
   """A view for displaying a form and rendering a template response."""
   pass
