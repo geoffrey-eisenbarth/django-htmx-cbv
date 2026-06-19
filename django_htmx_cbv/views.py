@@ -5,7 +5,9 @@ from django.contrib.messages.views import SuccessMessageMixin
 from django.core.exceptions import (
   ImproperlyConfigured, PermissionDenied, BadRequest,
 )
+from django.forms import ChoiceField
 from django.http import HttpResponse, HttpResponseRedirect
+from django.utils.translation import gettext_lazy as _
 from django.views.generic.base import TemplateResponseMixin, View
 from django.views.generic.detail import SingleObjectMixin
 from django.views.generic.edit import FormMixin, ModelFormMixin
@@ -13,11 +15,13 @@ from django.views.generic.edit import FormMixin, ModelFormMixin
 
 if TYPE_CHECKING:
   from collections.abc import Mapping
-  from typing import Any, Protocol, Sequence
+  from typing import Any, Protocol, Sequence, Iterable
   from django import forms
-  from django.db.models import Model
+  from django.db.models import Model, QuerySet
   from django.http import HttpRequest, QueryDict
   from django_htmx.middleware import HtmxDetails
+
+  Choices = Iterable[tuple[str, str]] | QuerySet[Any]
 
   class HtmxRequest(Protocol):
     htmx: HtmxDetails
@@ -385,3 +389,52 @@ class ModelFormView[_M: Model, _F: forms.ModelForm[Any]](
     else:
       response = HttpResponseRedirect(self.get_success_url())
     return response
+
+
+class HtmxChainedFormView[_F: forms.BaseForm](ProcessHyperFormView[_F]):
+  """Facilitates dynamic/chained form fields."""
+
+  def get_field_choices(self) -> dict[str, Choices]:
+    raise ImproperlyConfigured(_(
+      "HtmxChainedFormView requires an implementation of `get_field_choices()`."  # noqa: E501
+    ))
+
+  def get_form_kwargs(self) -> dict[str, Any]:
+    """Override to provide `field_choices` kwarg.
+
+    Notes
+    -----
+    Django Form instances that are going to be used with this view must
+    allow a `field_choices` kwarg in their __init__ method.
+
+    """
+    kwargs = super().get_form_kwargs()
+    if hasattr(self.request, 'htmx') and self.request.htmx:
+      kwargs['field_choices'] = self.get_field_choices()
+    return kwargs
+
+  def _render_chained_field(self, form: _F, target: str) -> HttpResponse:
+    """Return the HTML for the chained field matching the HTMX target id."""
+    form_field_id_to_name = {
+      bound_field.id_for_label: bound_field.name
+      for bound_field in form
+      if isinstance(bound_field.field, ChoiceField)
+    }
+    try:
+      field_name = form_field_id_to_name[target]
+    except KeyError:
+      raise ImproperlyConfigured(_(
+        f"HTMX target '{target}' does not match any form field IDs."
+      ))
+    return HttpResponse(str(form[field_name]))
+
+  def get(
+    self,
+    request: HttpRequest,
+    *args: Any,
+    **kwargs: Any,
+  ) -> HttpResponse:
+    if hasattr(request, 'htmx') and request.htmx:
+      form = self.get_form()
+      return self._render_chained_field(form, request.htmx.target)
+    return super().get(request, *args, **kwargs)
