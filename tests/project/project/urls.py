@@ -5,6 +5,11 @@ from app import views as app_views
 
 urlpatterns = [
   path(
+    'vehicle/',
+    app_views.VehicleFormView.as_view(),
+    name='vehicle',
+  ),
+  path(
     'page/',
     app_views.PageView.as_view(),
     name='page',
