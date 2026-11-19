@@ -33,8 +33,8 @@ Add the app to `INSTALLED_APPS`:
 
 ```py
 INSTALLED_APPS = [
-    # ...
-    "django_htmx_cbv",
+  # ...
+  "django_htmx_cbv",
 ]
 ```
 
@@ -42,15 +42,13 @@ Add middleware in this order:
 
 ```py
 MIDDLEWARE = [
-    # Django middleware...
-
-    "django_htmx.middleware.HtmxMiddleware",
-    "django_htmx_cbv.middleware.HtmxPartialTemplateMiddleware",
-    "django_htmx_cbv.middleware.HtmxVaryMiddleware",
-    "django_htmx_cbv.middleware.HtmxMessageMiddleware",
-    "django_htmx_cbv.middleware.HttpVerbViewMiddleware",
-
-    # Other middleware...
+  # Django middleware...
+  "django_htmx.middleware.HtmxMiddleware",
+  "django_htmx_cbv.middleware.HtmxPartialTemplateMiddleware",
+  "django_htmx_cbv.middleware.HtmxVaryMiddleware",
+  "django_htmx_cbv.middleware.HtmxMessageMiddleware",
+  "django_htmx_cbv.middleware.HttpVerbViewMiddleware",
+  # Other middleware...
 ]
 ```
 
@@ -133,11 +131,11 @@ Use `HyperFormView` or `ModelFormView` when you want a full HTMX-aware form view
 
 ```py
 from django_htmx_cbv.views import (
-    HtmxFormMixin,
-    HtmxTemplateResponseMixin,
-    HyperFormView,
-    ModelFormView,
-    ProcessHyperFormView,
+  HtmxFormMixin,
+  HtmxTemplateResponseMixin,
+  HyperFormView,
+  ModelFormView,
+  ProcessHyperFormView,
 )
 ```
 
