@@ -17,8 +17,7 @@ dependencies = [
 dev = [
     "ipython (>=9.12.0,<10.0.0)",
     "ipdb (>=0.13.13,<0.14.0)",
-    "flake8 (>=7.3.0,<8.0.0)",
-    "flake8-type-checking (>=3.2.0,<4.0.0)",
+    "ruff>=0.16.7",
     "mypy (>=1.20.1,<2.0.0)",
     "django-stubs (>=6.0.2,<7.0.0)",
     "django-stubs-ext (>=6.0.2,<7.0.0)",
@@ -27,17 +26,57 @@ dev = [
     "codecov (>=2.1.13,<3.0.0)",
     "parameterized (>=0.9.0,<0.10.0)",
     "beautifulsoup4 (>=4.14.3,<5.0.0)",
-    "pre-commit (>=4.5.1,<5.0.0)"
+    "pre-commit (>=4.5.1,<5.0.0)",
+    "coverage>=7.13.5",
 ]
 
 
 [build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["uv_build>=0.12.12,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""
+
+[tool.ruff]
+line-length = 88
+indent-width = 2
+target-version = "py314"
+exclude = [
+  "*/migrations/*",
+  "manage.py",
+  "settings.py",
+  "local_settings.py",
+  "vendor.py",
+]
+
+[tool.ruff.lint]
+select = [
+  "E",        # pycodestyle errors
+  "W",        # pycodestyle warnings
+  "F",        # pyflakes (unused imports, undefined names, etc.)
+  "I",        # isort (automatically sorts and organizes imports)
+  "UP",       # pyupgrade (modernizes Python syntax)
+  "RUF100",   # flags unused noqa comments
+  "DJ",       # flake8-django
+]
+ignore = [
+  "E111",  # Indentation is not a multiple of four
+  "E114",  # Comment indentation is not a multiple of four
+  "E731",  # Do not assign a lambda expression, use a def
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "project.settings"
 pythonpath = ["tests/project"]
+
+[tool.coverage.run]
+branch = true
+source = ["django_htmx_cbv"]
 
 [tool.coverage.report]
 show_missing = true
@@ -53,6 +92,10 @@ exclude = [
   "tests/project/manage.py",
   "tests/project/project",
 ]
+
+[[tool.mypy.overrides]]
+module = ["tests.project.test_middleware"]
+disallow_untyped_decorators = false
 
 [tool.django-stubs]
 django_settings_module = "tests.project.project.settings"

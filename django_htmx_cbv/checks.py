@@ -3,16 +3,16 @@ from typing import TYPE_CHECKING
 from django.conf import settings
 from django.core.checks import Error, register
 
-
 if TYPE_CHECKING:
   from collections.abc import Iterable, Sequence
   from typing import Any
+
   from django.apps import AppConfig
   from django.core.checks import CheckMessage
 
 
-HTMX_MIDDLEWARE = 'django_htmx.middleware.HtmxMiddleware'
-CBV_MIDDLEWARE_PREFIX = 'django_htmx_cbv.middleware.'
+HTMX_MIDDLEWARE = "django_htmx.middleware.HtmxMiddleware"
+CBV_MIDDLEWARE_PREFIX = "django_htmx_cbv.middleware."
 
 
 @register()
@@ -22,7 +22,7 @@ def check_htmx_middleware_order(
   databases: Sequence[str] | None = None,
   **kwargs: Any,
 ) -> Iterable[CheckMessage]:
-  middleware = list(getattr(settings, 'MIDDLEWARE', []))
+  middleware = list(getattr(settings, "MIDDLEWARE", []))
   cbv_indices = [
     index
     for index, path in enumerate(middleware)
@@ -39,7 +39,7 @@ def check_htmx_middleware_order(
           "Add 'django_htmx.middleware.HtmxMiddleware' before any "
           "'django_htmx_cbv.middleware.*' entries in MIDDLEWARE."
         ),
-        id='django_htmx_cbv.E001',
+        id="django_htmx_cbv.E001",
       )
     ]
 
@@ -52,7 +52,7 @@ def check_htmx_middleware_order(
           "Move 'django_htmx.middleware.HtmxMiddleware' above all "
           "'django_htmx_cbv.middleware.*' entries in MIDDLEWARE."
         ),
-        id='django_htmx_cbv.E002',
+        id="django_htmx_cbv.E002",
       )
     ]
 

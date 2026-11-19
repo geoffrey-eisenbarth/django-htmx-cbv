@@ -3,7 +3,9 @@ from typing import TYPE_CHECKING, cast
 from django.contrib import messages
 from django.contrib.messages.views import SuccessMessageMixin
 from django.core.exceptions import (
-  ImproperlyConfigured, PermissionDenied, BadRequest,
+  BadRequest,
+  ImproperlyConfigured,
+  PermissionDenied,
 )
 from django.forms import ChoiceField
 from django.http import HttpResponse, HttpResponseRedirect
@@ -12,10 +14,10 @@ from django.views.generic.base import TemplateResponseMixin, View
 from django.views.generic.detail import SingleObjectMixin
 from django.views.generic.edit import FormMixin, ModelFormMixin
 
-
 if TYPE_CHECKING:
-  from collections.abc import Mapping
-  from typing import Any, Protocol, Sequence, Iterable
+  from collections.abc import Iterable, Mapping, Sequence
+  from typing import Any, Protocol
+
   from django import forms
   from django.db.models import Model, QuerySet
   from django.http import HttpRequest, QueryDict
@@ -30,15 +32,14 @@ if TYPE_CHECKING:
     QUERY: QueryDict
     BODY: QueryDict
 
-  class FormClassWithBaseFields[_F: forms.BaseForm](Protocol):
+  class FormClassWithBaseFields[F: forms.BaseForm](Protocol):
     base_fields: Mapping[str, object]
 
     def __call__(
       self,
       *args: Any,
       **kwargs: Any,
-    ) -> _F:
-      ...
+    ) -> F: ...
 
   class SupportsSetup(Protocol):
     def setup(
@@ -46,12 +47,10 @@ if TYPE_CHECKING:
       request: HttpRequest,
       *args: Any,
       **kwargs: Any,
-    ) -> None:
-      ...
+    ) -> None: ...
 
   class SupportsContextData(Protocol):
-    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
-      ...
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]: ...
 
 
 class HtmxTemplateResponseMixin(TemplateResponseMixin):
@@ -60,19 +59,19 @@ class HtmxTemplateResponseMixin(TemplateResponseMixin):
   def _finalize_htmx_response(
     self,
     response: HttpResponse,
-    **context: 'Any',
+    **context: Any,
   ) -> HttpResponse:
-    request = cast('HtmxRequest', self.request)
+    request = cast("HtmxRequest", self.request)
     if request.htmx:
-      context_mixin = cast('SupportsContextData', self)
+      context_mixin = cast("SupportsContextData", self)
       rendered_context = context_mixin.get_context_data(**context)
       response = self.render_to_response(rendered_context)
     return response
 
 
-class HtmxFormMixin[_F: forms.BaseForm](
+class HtmxFormMixin[F: forms.BaseForm](
   HtmxTemplateResponseMixin,
-  FormMixin[_F],
+  FormMixin[F],
 ):
   """Mixin for facilitating HTMX submission of forms.
 
@@ -82,7 +81,7 @@ class HtmxFormMixin[_F: forms.BaseForm](
 
   """
 
-  def form_valid(self, form: _F) -> HttpResponse:
+  def form_valid(self, form: F) -> HttpResponse:
     """The POST/Redirect/GET pattern is not necessary with HTMX.
 
     Notes
@@ -94,10 +93,10 @@ class HtmxFormMixin[_F: forms.BaseForm](
     response = super().form_valid(form)
     return self._finalize_htmx_response(response, form=form)
 
-  def form_invalid(self, form: _F) -> HttpResponse:
+  def form_invalid(self, form: F) -> HttpResponse:
     """Retarget form errors."""
     response = super().form_invalid(form)
-    request = cast('HtmxRequest', self.request)
+    request = cast("HtmxRequest", self.request)
 
     if request.htmx:
       if request.htmx.trigger is None:
@@ -106,32 +105,34 @@ class HtmxFormMixin[_F: forms.BaseForm](
           "with an HTML id and matching partial block name."
         )
         raise ImproperlyConfigured(message)
-      response['HX-Retarget'] = f'#{request.htmx.trigger}'
-      response['HX-Reswap'] = 'outerHTML'
+      response["HX-Retarget"] = f"#{request.htmx.trigger}"
+      response["HX-Reswap"] = "outerHTML"
     return response
 
 
-class HyperFormMixin[_F: forms.BaseForm](HtmxFormMixin[_F]):
+class HyperFormMixin[F: forms.BaseForm](HtmxFormMixin[F]):
   """Add support for all HTTP Verbs to Django's FormMixin."""
 
-  http_method_names: Sequence[str] = ('get', 'post', 'put', 'patch', 'delete')
+  http_method_names: Sequence[str] = ("get", "post", "put", "patch", "delete")
 
   def get_initial(self) -> dict[str, Any]:
     initial = super().get_initial()
 
     assert self.form_class is not None
-    request = cast('HtmxRequest', self.request)
-    form_class = cast('FormClassWithBaseFields[_F]', self.form_class)
+    request = cast("HtmxRequest", self.request)
+    form_class = cast("FormClassWithBaseFields[F]", self.form_class)
 
-    form_method = getattr(form_class, 'method', '').upper()
+    form_method = getattr(form_class, "method", "").upper()
     # TODO: Or if self.http_method_names != ['get']?
-    if form_method != 'GET' and request.QUERY:
+    if form_method != "GET" and request.QUERY:
       # Pass relevant URL params to the form as initial values
-      initial.update({
-        key: value
-        for key, value in request.QUERY.dict().items()
-        if key in form_class.base_fields
-      })
+      initial.update(
+        {
+          key: value
+          for key, value in request.QUERY.dict().items()
+          if key in form_class.base_fields
+        }
+      )
     return initial
 
   def get_form_kwargs(self) -> dict[str, Any]:
@@ -147,29 +148,33 @@ class HyperFormMixin[_F: forms.BaseForm](HtmxFormMixin[_F]):
     `self.get_initial()`.
 
     """
-    request = cast('HtmxRequest', self.request)
+    request = cast("HtmxRequest", self.request)
 
     kwargs = super().get_form_kwargs()
     # TODO: or if self.http_method_names == ['get']?
-    if getattr(self.form_class, 'method', '').upper() == 'GET':
-      if data := (request.QUERY or kwargs.get('initial')):
-        kwargs.update({
-          'data': data,
-          'files': request.FILES,
-        })
+    if getattr(self.form_class, "method", "").upper() == "GET":
+      if data := (request.QUERY or kwargs.get("initial")):
+        kwargs.update(
+          {
+            "data": data,
+            "files": request.FILES,
+          }
+        )
       else:
         # Must avoid binding the form by passing an empty dict to `data`
         pass
-    elif request.method != 'GET':
-      kwargs.update({
-        'data': request.BODY,
-        'files': request.FILES,
-      })
+    elif request.method != "GET":
+      kwargs.update(
+        {
+          "data": request.BODY,
+          "files": request.FILES,
+        }
+      )
     return kwargs
 
-  def form_valid(self, form: _F) -> HttpResponse:
+  def form_valid(self, form: F) -> HttpResponse:
     """Proper response handling per HTTP verb."""
-    if self.request.method == 'GET':
+    if self.request.method == "GET":
       message = (
         "Views that inherit from HyperFormMixin must implement "
         "a custom `form_valid()` for forms with [method=get]."
@@ -178,7 +183,7 @@ class HyperFormMixin[_F: forms.BaseForm](HtmxFormMixin[_F]):
     return super().form_valid(form)
 
 
-class ProcessHyperFormView[_F: forms.BaseForm](HyperFormMixin[_F], View):
+class ProcessHyperFormView[F: forms.BaseForm](HyperFormMixin[F], View):
   """Render a form on GET and facilitate processing on any verb."""
 
   def get(
@@ -249,15 +254,31 @@ class ProcessHyperFormView[_F: forms.BaseForm](HyperFormMixin[_F], View):
 
 
 # TODO: What's the point if all the functionality is in ProcessHyperFormView?
-class HyperFormView[_F: forms.BaseForm](ProcessHyperFormView[_F]):
+class HyperFormView[F: forms.BaseForm](ProcessHyperFormView[F]):
   """A view for displaying a form and rendering a template response."""
+
   pass
 
 
-class SingleObjectPermissionMixin[_M: Model](SingleObjectMixin[_M]):
+class SingleObjectPermissionMixin[M: Model](SingleObjectMixin[M]):
   """Adds a permisssions check to SingleObjectMixin."""
 
-  object: _M | None
+  object: M | None
+  kwargs: dict[str, Any]
+
+  def get_object_or_none(
+    self,
+    queryset: QuerySet[M] | None = None,
+  ) -> M | None:
+    """Resolve the object to operate on, or None when creating.
+
+    Returns the pk/slug object when the URL identifies one, otherwise None.
+    Subclasses may override to resolve the object by other means, such as
+    the request user, while still returning None to signal object creation.
+    """
+    if self.pk_url_kwarg in self.kwargs or self.slug_url_kwarg in self.kwargs:
+      return self.get_object(queryset)
+    return None
 
   def setup(
     self,
@@ -265,16 +286,8 @@ class SingleObjectPermissionMixin[_M: Model](SingleObjectMixin[_M]):
     *args: Any,
     **kwargs: Any,
   ) -> None:
-    cast('SupportsSetup', super()).setup(request, *args, **kwargs)
-    if (
-      self.pk_url_kwarg in kwargs
-      or self.slug_url_kwarg in kwargs
-    ):
-      # Update or delete object
-      self.object = self.get_object(*args, **kwargs)
-    else:
-      # Create object
-      self.object = None
+    cast("SupportsSetup", super()).setup(request, *args, **kwargs)
+    self.object = self.get_object_or_none()
 
     # Verify the User has CRUD permissions
     if not self.has_permission(request, self.object):
@@ -283,7 +296,7 @@ class SingleObjectPermissionMixin[_M: Model](SingleObjectMixin[_M]):
   def has_permission(
     self,
     request: HttpRequest,
-    obj: _M | None,
+    obj: M | None,
   ) -> bool:
     message = (
       "SingleObjectPermissionMixin requires that subclasses define a "
@@ -293,11 +306,11 @@ class SingleObjectPermissionMixin[_M: Model](SingleObjectMixin[_M]):
     raise ImproperlyConfigured(message)
 
 
-class ModelFormView[_M: Model, _F: forms.ModelForm[Any]](
-  SuccessMessageMixin[_F],
-  SingleObjectPermissionMixin[_M],
-  ModelFormMixin[_M, _F],
-  HyperFormView[_F],
+class ModelFormView[M: Model, F: forms.ModelForm[Any]](
+  SuccessMessageMixin[F],
+  SingleObjectPermissionMixin[M],
+  ModelFormMixin[M, F],
+  HyperFormView[F],
 ):
   """Combines Django's CreateView, UpdateView, and DeleteView via HTMX.
 
@@ -318,10 +331,10 @@ class ModelFormView[_M: Model, _F: forms.ModelForm[Any]](
 
   """
 
-  http_method_names: Sequence[str] = ('get', 'post', 'patch', 'put', 'delete')
+  http_method_names: Sequence[str] = ("get", "post", "patch", "put", "delete")
 
-  def form_valid(self, form: _F) -> HttpResponse:
-    if self.request.method != 'PATCH':
+  def form_valid(self, form: F) -> HttpResponse:
+    if self.request.method != "PATCH":
       return super().form_valid(form)
 
     self.object = form.save(commit=False)
@@ -344,7 +357,7 @@ class ModelFormView[_M: Model, _F: forms.ModelForm[Any]](
     request: HttpRequest,
     *args: Any,
     **kwargs: Any,
-   ) -> HttpResponse:
+  ) -> HttpResponse:
     """Delete the object or the requested relationships.
 
     Notes
@@ -354,12 +367,12 @@ class ModelFormView[_M: Model, _F: forms.ModelForm[Any]](
 
     """
     assert self.object is not None
-    htmx_request = cast('HtmxRequest', request)
+    htmx_request = cast("HtmxRequest", request)
 
     field_names = set(f.name for f in self.object._meta.get_fields())
     param_names = set(htmx_request.QUERY)
 
-    if (related_names := (field_names & param_names)):
+    if related_names := (field_names & param_names):
       # Do not delete the primary object, only the related data
       for name in related_names:
         field = self.object._meta.get_field(name)
@@ -384,7 +397,7 @@ class ModelFormView[_M: Model, _F: forms.ModelForm[Any]](
     if message := self.get_success_message({}):
       messages.error(request, message)
 
-    if cast('HtmxRequest', self.request).htmx:
+    if cast("HtmxRequest", self.request).htmx:
       # No need to redirect, just render the normal GET response
       response = self.render_to_response(self.get_context_data())
     else:
@@ -392,13 +405,13 @@ class ModelFormView[_M: Model, _F: forms.ModelForm[Any]](
     return response
 
 
-class HtmxChainedFormView[_F: forms.BaseForm](ProcessHyperFormView[_F]):
+class HtmxChainedFormView[F: forms.BaseForm](ProcessHyperFormView[F]):
   """Facilitates dynamic/chained form fields."""
 
   def get_field_choices(self) -> dict[str, Choices]:
-    raise ImproperlyConfigured(_(
-      "HtmxChainedFormView requires an implementation of `get_field_choices()`."  # noqa: E501
-    ))
+    raise ImproperlyConfigured(
+      _("HtmxChainedFormView requires an implementation of `get_field_choices()`.")
+    )
 
   def get_form_kwargs(self) -> dict[str, Any]:
     """Override to provide `field_choices` kwarg.
@@ -410,11 +423,11 @@ class HtmxChainedFormView[_F: forms.BaseForm](ProcessHyperFormView[_F]):
 
     """
     kwargs = super().get_form_kwargs()
-    if hasattr(self.request, 'htmx') and self.request.htmx:
-      kwargs['field_choices'] = self.get_field_choices()
+    if hasattr(self.request, "htmx") and self.request.htmx:
+      kwargs["field_choices"] = self.get_field_choices()
     return kwargs
 
-  def _render_chained_field(self, form: _F, target: str) -> HttpResponse:
+  def _render_chained_field(self, form: F, target: str) -> HttpResponse:
     """Return the HTML for the chained field matching the HTMX target id."""
     form_field_id_to_name = {
       bound_field.id_for_label: bound_field.name
@@ -424,9 +437,9 @@ class HtmxChainedFormView[_F: forms.BaseForm](ProcessHyperFormView[_F]):
     try:
       field_name = form_field_id_to_name[target]
     except KeyError:
-      raise ImproperlyConfigured(_(
-        f"HTMX target '{target}' does not match any form field IDs."
-      ))
+      raise ImproperlyConfigured(
+        _(f"HTMX target '{target}' does not match any form field IDs.")
+      )
     return HttpResponse(str(form[field_name]))
 
   def get(
@@ -435,7 +448,7 @@ class HtmxChainedFormView[_F: forms.BaseForm](ProcessHyperFormView[_F]):
     *args: Any,
     **kwargs: Any,
   ) -> HttpResponse:
-    if hasattr(request, 'htmx') and request.htmx:
+    if hasattr(request, "htmx") and request.htmx:
       form = self.get_form()
       return self._render_chained_field(form, request.htmx.target)
     return super().get(request, *args, **kwargs)

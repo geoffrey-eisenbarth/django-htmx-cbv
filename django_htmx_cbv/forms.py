@@ -1,13 +1,13 @@
 from typing import TYPE_CHECKING
 
+from django import forms
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import QuerySet
-from django import forms
 from django.utils.translation import gettext_lazy as _
 
-
 if TYPE_CHECKING:
-  from typing import Any, Iterable
+  from collections.abc import Iterable
+  from typing import Any
 
   Choices = Iterable[tuple[str, str]] | QuerySet[Any]
 
@@ -33,6 +33,6 @@ class HtmxChainedForm(forms.Form):
         elif isinstance(field, forms.ChoiceField):
           field.choices = choices
         else:
-          raise ImproperlyConfigured(_(
-            f"Field '{field_name}' does not support choices."
-          ))
+          raise ImproperlyConfigured(
+            _(f"Field '{field_name}' does not support choices.")
+          )

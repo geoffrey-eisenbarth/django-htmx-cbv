@@ -1,42 +1,40 @@
-from django.urls import path
-
 from app import views as app_views
-
+from django.urls import path
 
 urlpatterns = [
   path(
-    'vehicle/',
+    "vehicle/",
     app_views.VehicleFormView.as_view(),
-    name='vehicle',
+    name="vehicle",
   ),
   path(
-    'page/',
+    "page/",
     app_views.PageView.as_view(),
-    name='page',
+    name="page",
   ),
   path(
-    'page/message',
+    "page/message",
     app_views.MessageView.as_view(),
-    name='message',
+    name="message",
   ),
   path(
-    'page/message-204',
+    "page/message-204",
     app_views.Message204View.as_view(),
-    name='message_204',
+    name="message_204",
   ),
   path(
-    'page/hx-retarget',
+    "page/hx-retarget",
     app_views.HXRetargetView.as_view(),
-    name='hx_retarget',
+    name="hx_retarget",
   ),
   path(
-    'page/hx-partial-name',
+    "page/hx-partial-name",
     app_views.HXPartialNameView.as_view(),
-    name='hx_partial_name',
+    name="hx_partial_name",
   ),
   path(
-    'redirect_302/',
+    "redirect_302/",
     app_views.redirect_302,
-    name='redirect_302',
+    name="redirect_302",
   ),
 ]
