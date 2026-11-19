@@ -5,33 +5,36 @@ from django.contrib.messages import get_messages
 from django.core.exceptions import ImproperlyConfigured
 from django.http import HttpResponse, QueryDict
 from django.http.multipartparser import MultiPartParserError
-from django.template.loader import render_to_string
 from django.http.response import HttpResponseRedirectBase
+from django.template.loader import render_to_string
 from django.utils.cache import patch_vary_headers
-
 from django_htmx.http import HttpResponseClientRedirect
 from django_htmx.middleware import HtmxDetails
 
-
 if TYPE_CHECKING:
-  from typing import Any, Callable, Protocol, Sequence
+  from collections.abc import Callable, Sequence
+  from typing import Any
+
+  from django.core.files.uploadedfile import UploadedFile
   from django.http import HttpRequest
   from django.template.response import SimpleTemplateResponse
+  from django.utils.datastructures import MultiValueDict
 
-  class HtmxRequest(Protocol):
+  class HtmxRequest(HttpRequest):
     htmx: HtmxDetails
     QUERY: QueryDict
     BODY: QueryDict
+    FILES: MultiValueDict[str, UploadedFile[Any]]
 
 
-def _get_htmx_request(request: 'HttpRequest') -> 'HtmxRequest':
-  if not isinstance(getattr(request, 'htmx', None), HtmxDetails):
+def _get_htmx_request(request: HttpRequest) -> HtmxRequest:
+  if not isinstance(getattr(request, "htmx", None), HtmxDetails):
     message = (
       "django_htmx.middleware.HtmxMiddleware must be installed and run "
       "before django_htmx_cbv middleware."
     )
     raise ImproperlyConfigured(message)
-  return cast('HtmxRequest', request)
+  return cast("HtmxRequest", request)
 
 
 # TODO: PUSH: Make sure CSRF Protection is enabled for hx-put, patch, delete
@@ -56,7 +59,7 @@ class HtmxVaryMiddleware:
     response = self.get_response(request)
     htmx_request = _get_htmx_request(request)
     if htmx_request.htmx:
-      patch_vary_headers(response, ['HX-Request'])
+      patch_vary_headers(response, ["HX-Request"])
     return response
 
 
@@ -93,26 +96,25 @@ class HttpVerbViewMiddleware:
     htmx_request.QUERY = request.GET.copy()
     htmx_request.BODY = QueryDict()
 
-    if request.method in ['GET', 'DELETE']:
+    if request.method in ["GET", "DELETE"]:
       pass
-    elif request.method == 'POST':
+    elif request.method == "POST":
       htmx_request.BODY = request.POST.copy()
-    elif request.method in ['PUT', 'PATCH']:
-      if request.content_type == 'application/x-www-form-urlencoded':
+    elif request.method in ["PUT", "PATCH"]:
+      if request.content_type == "application/x-www-form-urlencoded":
         htmx_request.BODY = QueryDict(request.body)
-      elif request.content_type == 'multipart/form-data':
+      elif request.content_type == "multipart/form-data":
         try:
           body, files = request.parse_file_upload(request.META, request)
         except MultiPartParserError as exc:
           raise ImproperlyConfigured(str(exc)) from exc
         htmx_request.BODY = body.copy()
-        cast('Any', request)._post = body
-        cast('Any', request)._files = files
+        cast("Any", request)._post = body
+        cast("Any", request)._files = files
 
     if not htmx_request.htmx:
       if _method := (
-        htmx_request.BODY.get('_method')
-        or htmx_request.QUERY.get('_method')
+        htmx_request.BODY.get("_method") or htmx_request.QUERY.get("_method")
       ):
         request.method = _method.upper()
 
@@ -122,8 +124,8 @@ class HtmxPartialTemplateMiddleware:
 
   default_partial_name = getattr(
     settings,
-    'DEFAULT_PARTIAL_NAME',
-    'main',
+    "DEFAULT_PARTIAL_NAME",
+    "main",
   )
 
   def __init__(
@@ -146,9 +148,9 @@ class HtmxPartialTemplateMiddleware:
   ) -> SimpleTemplateResponse:
     htmx_request = _get_htmx_request(request)
     if htmx_request.htmx:
-      if retarget_id := response.get('HX-Retarget'):
-        partial_name = retarget_id.strip('#')
-      elif partial_name := response.get('HX-Partial-Name', ''):
+      if retarget_id := response.get("HX-Retarget"):
+        partial_name = retarget_id.strip("#")
+      elif partial_name := response.get("HX-Partial-Name", ""):
         # Allow the view to specify the partial name
         pass
       else:
@@ -160,13 +162,10 @@ class HtmxPartialTemplateMiddleware:
       if isinstance(template_name, str):
         template_names = [template_name]
       else:
-        template_names = list(cast('Sequence[str]', template_name))
+        template_names = list(cast("Sequence[str]", template_name))
 
       response.template_name = [
-        f'{name}#{partial_name}'
-        if '#' not in name
-        else name
-        for name in template_names
+        f"{name}#{partial_name}" if "#" not in name else name for name in template_names
       ]
     return response
 
@@ -196,8 +195,8 @@ class HtmxMessageMiddleware:
 
   messages_template = getattr(
     settings,
-    'MESSAGES_TEMPLATE_NAME',
-    'messages.html',
+    "MESSAGES_TEMPLATE_NAME",
+    "messages.html",
   )
 
   def __init__(
@@ -210,13 +209,13 @@ class HtmxMessageMiddleware:
 
     response = self.get_response(request)
 
-    if 'HX-Request' not in request.headers:
+    if "HX-Request" not in request.headers:
       # Not an HTMX request, so full page rendering will pick up the message
       return response
     elif 300 <= response.status_code < 400:
       # Ignore redirections because HTMX cannot read the body
       return response
-    elif 'HX-Redirect' in response.headers:
+    elif "HX-Redirect" in response.headers:
       # Ignore client-side redirection because HTMX drops OOB swabs
       return response
 
@@ -224,7 +223,7 @@ class HtmxMessageMiddleware:
     if messages := get_messages(request):
       html = render_to_string(
         template_name=self.messages_template,
-        context={'messages': messages},
+        context={"messages": messages},
         request=request,
       )
       if response.status_code == 204:

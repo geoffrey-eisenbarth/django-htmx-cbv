@@ -1,23 +1,24 @@
+from typing import TYPE_CHECKING, cast
 from urllib.parse import urlencode
 
 from bs4 import BeautifulSoup
-from parameterized import parameterized
-
 from django.core.checks import run_checks
-from django.http import HttpResponse, QueryDict
+from django.core.files.uploadedfile import SimpleUploadedFile, UploadedFile
+from django.http import HttpResponse, HttpResponseBase, QueryDict
 from django.test import Client, RequestFactory, TestCase, override_settings
 from django.test.client import BOUNDARY, MULTIPART_CONTENT, encode_multipart
 from django.urls import reverse
-from django.core.files.uploadedfile import SimpleUploadedFile
-
 from django_htmx.http import HttpResponseClientRedirect
 from django_htmx.middleware import HtmxDetails
+from parameterized import parameterized
 
 from django_htmx_cbv.middleware import HttpVerbViewMiddleware
 
+if TYPE_CHECKING:
+  from django_htmx_cbv.middleware import HtmxRequest
+
 
 class HttpVerbViewMiddlewareTest(TestCase):
-
   def setUp(self) -> None:
     self.client = Client()
     self.factory = RequestFactory()
@@ -25,25 +26,27 @@ class HttpVerbViewMiddlewareTest(TestCase):
   def tearDown(self) -> None:
     pass
 
-  @parameterized.expand([
-    ('GET'),
-    ('POST'),
-    ('PATCH'),
-    ('PUT'),
-    ('DELETE'),
-  ])
+  @parameterized.expand(
+    [
+      ("GET"),
+      ("POST"),
+      ("PATCH"),
+      ("PUT"),
+      ("DELETE"),
+    ]
+  )
   def test_querydicts(self, method: str) -> None:
-    query = 'foo=bar'
-    url = reverse('page') + '?' + query
+    query = "foo=bar"
+    url = reverse("page") + "?" + query
 
-    if method == 'GET':
-      body, content_type = '', None
+    if method == "GET":
+      body, content_type = "", None
     else:
-      content_type = 'application/x-www-form-urlencoded'
-      if method in ['POST', 'PATCH', 'PUT']:
-        body = urlencode({'int': 1, 'str': '1'})
-      elif method == 'DELETE':
-        body = ''
+      content_type = "application/x-www-form-urlencoded"
+      if method in ["POST", "PATCH", "PUT"]:
+        body = urlencode({"int": 1, "str": "1"})
+      elif method == "DELETE":
+        body = ""
 
     response = getattr(self.client, method.lower())(
       url,
@@ -55,97 +58,111 @@ class HttpVerbViewMiddlewareTest(TestCase):
     self.assertEqual(request.QUERY, QueryDict(query))
     self.assertEqual(request.BODY, QueryDict(body))
 
-  @parameterized.expand([
-    ('PATCH'),
-    ('PUT'),
-    ('DELETE'),
-  ])
+  @parameterized.expand(
+    [
+      ("PATCH"),
+      ("PUT"),
+      ("DELETE"),
+    ]
+  )
   def test_method_overriding(self, _method: str) -> None:
     response = self.client.post(
-      path=reverse('page'),
-      data=urlencode({
-        '_method': _method,
-        'foo': 'bar',
-      }),
-      content_type='application/x-www-form-urlencoded',
+      path=reverse("page"),
+      data=urlencode(
+        {
+          "_method": _method,
+          "foo": "bar",
+        }
+      ),
+      content_type="application/x-www-form-urlencoded",
     )
     request = response.wsgi_request
 
     self.assertEqual(request.method, _method)
 
-  @parameterized.expand([
-    ('PATCH'),
-    ('PUT'),
-  ])
+  @parameterized.expand(
+    [
+      ("PATCH"),
+      ("PUT"),
+    ]
+  )
   def test_multipart_body_and_files(self, method: str) -> None:
     upload = SimpleUploadedFile(
-      'hello.txt',
-      b'hello world',
-      content_type='text/plain',
+      "hello.txt",
+      b"hello world",
+      content_type="text/plain",
     )
-    body = encode_multipart(BOUNDARY, {
-      'name': 'example',
-      'upload': upload,
-    })
-    request = self.factory.generic(
-      method,
-      reverse('page'),
-      data=body,
-      content_type=MULTIPART_CONTENT,
+    body = encode_multipart(
+      BOUNDARY,
+      {
+        "name": "example",
+        "upload": upload,
+      },
+    )
+    request = cast(
+      "HtmxRequest",
+      self.factory.generic(
+        method,
+        reverse("page"),
+        data=body,
+        content_type=MULTIPART_CONTENT,
+      ),
     )
     request.htmx = HtmxDetails(request)
 
     middleware = HttpVerbViewMiddleware(lambda req: HttpResponse())
     middleware.process_view(request, lambda req: HttpResponse(), (), {})
 
-    self.assertEqual(request.BODY, QueryDict('name=example'))
-    self.assertIn('upload', request.FILES)
-    self.assertEqual(request.FILES['upload'].name, 'hello.txt')
+    self.assertEqual(request.BODY, QueryDict("name=example"))
+    self.assertIn("upload", request.FILES)
+    uploaded = request.FILES["upload"]
+    assert isinstance(uploaded, UploadedFile)
+    self.assertEqual(uploaded.name, "hello.txt")
 
 
 class HtmxVaryMiddlewareTest(TestCase):
-
   def setUp(self) -> None:
     self.client = Client()
 
   def test_vary(self) -> None:
     response = self.client.get(
-      path=reverse('page'),
-      headers={'HX-Request': 'true'},
+      path=reverse("page"),
+      headers={"HX-Request": "true"},
     )
-    self.assertEqual(response.headers['Vary'], 'HX-Request')
+    self.assertEqual(response.headers["Vary"], "HX-Request")
 
 
 class SoupTestCase(TestCase):
   def setUp(self) -> None:
     self.client = Client()
 
-  def get_soup(self, response: HttpResponse) -> BeautifulSoup:
-    soup = BeautifulSoup(response.content, features='html.parser')
-    return soup
+  def get_soup(self, response: HttpResponseBase) -> BeautifulSoup:
+    # Django's test Client types responses as HttpResponseBase, but this
+    # project's views always return a real HttpResponse at runtime.
+    http_response = cast(HttpResponse, response)
+    return BeautifulSoup(http_response.content, features="html.parser")
 
 
 class HtmxPartialTemplateMiddlewareTest(SoupTestCase):
-
   def test_response_client_redirect(self) -> None:
     response = self.client.get(
-      path=reverse('redirect_302'),
-      headers={'HX-Request': 'true'},
+      path=reverse("redirect_302"),
+      headers={"HX-Request": "true"},
     )
     self.assertIsInstance(response, HttpResponseClientRedirect)
 
   def test_process_template_response(self) -> None:
     # Return full HTML response
     response = self.client.get(
-      path=reverse('page'),
+      path=reverse("page"),
     )
     soup = self.get_soup(response)
     self.assertIsNotNone(soup.html)
 
     # Return the default partial name: 'main'
     response = self.client.get(
-      path=reverse('page'),
-      headers={'HX-Request': 'true'},
+      path=reverse("page"),
+      headers={"HX-Request": "true"},
     )
     soup = self.get_soup(response)
     self.assertIsNone(soup.html)
@@ -153,8 +170,8 @@ class HtmxPartialTemplateMiddlewareTest(SoupTestCase):
 
     # Return the requested partial: 'text'
     response = self.client.get(
-      path=reverse('page'),
-      headers={'HX-Request': 'true', 'HX-Target': 'text'},
+      path=reverse("page"),
+      headers={"HX-Request": "true", "HX-Target": "text"},
     )
     soup = self.get_soup(response)
     self.assertIsNone(soup.html)
@@ -163,18 +180,17 @@ class HtmxPartialTemplateMiddlewareTest(SoupTestCase):
 
     # Honor a HX-Retarget set in the view
     response = self.client.get(
-      path=reverse('hx_retarget'),
-      headers={'HX-Request': 'true', 'HX-Target': 'main'},
+      path=reverse("hx_retarget"),
+      headers={"HX-Request": "true", "HX-Target": "main"},
     )
     soup = self.get_soup(response)
     self.assertIsNone(soup.html)
     self.assertIsNone(soup.main)
-    self.assertEqual(response['HX-Retarget'], 'text')
+    self.assertEqual(response["HX-Retarget"], "text")
 
     # Honor a HX-Partial-Name set in the view
     response = self.client.get(
-      path=reverse('hx_partial_name'),
-      headers={'HX-Request': 'true'}
+      path=reverse("hx_partial_name"), headers={"HX-Request": "true"}
     )
     soup = self.get_soup(response)
     self.assertIsNone(soup.html)
@@ -187,70 +203,70 @@ class HtmxMessageMiddlewareTest(SoupTestCase):
 
     # Verify message in non-HTMX request
     response = self.client.get(
-      path=reverse('message'),
+      path=reverse("message"),
     )
     soup = self.get_soup(response)
     self.assertIsNotNone(soup.html)
-    self.assertIsNotNone(soup.find('li', class_='success'))
+    self.assertIsNotNone(soup.find("li", class_="success"))
 
     # Verify message in non-HTMX request as OOB swap
     response = self.client.get(
-      path=reverse('message'),
-      headers={'HX-Request': 'true'},
+      path=reverse("message"),
+      headers={"HX-Request": "true"},
     )
     soup = self.get_soup(response)
     self.assertIsNone(soup.html)
-    self.assertIsNotNone(soup.find('li', class_='success'))
+    self.assertIsNotNone(soup.find("li", class_="success"))
 
     # Ignore redirections because HTMX cannot read the body
     response = self.client.get(
-      path=reverse('redirect_302'),
+      path=reverse("redirect_302"),
       follow=True,
     )
     soup = self.get_soup(response)
     self.assertIsNotNone(soup.html)
-    self.assertIsNotNone(soup.find('li', class_='success'))
+    self.assertIsNotNone(soup.find("li", class_="success"))
 
     # Ignore client-side redirection because HTMX drops OOB swabs
     response = self.client.get(
-      path=reverse('redirect_302'),
-      headers={'HX-Request': 'true'},
+      path=reverse("redirect_302"),
+      headers={"HX-Request": "true"},
     )
     response = self.client.get(
-      path=response.headers['HX-Redirect'],
+      path=response.headers["HX-Redirect"],
       # TODO: When htmx does HX-Redirect, does it send headers?
       # headers={'HX-Request': 'true'},
     )
     soup = self.get_soup(response)
     self.assertIsNotNone(soup.html)
-    self.assertIsNotNone(soup.find('li', class_='success'))
+    self.assertIsNotNone(soup.find("li", class_="success"))
 
     # A 204 response should be converted to a 200 response
     response = self.client.get(
-      path=reverse('message_204'),
-      headers={'HX-Request': 'true'},
+      path=reverse("message_204"),
+      headers={"HX-Request": "true"},
     )
     self.assertEqual(response.status_code, 200)
     soup = self.get_soup(response)
-    self.assertIsNotNone(soup.find('li', class_='success'))
+    self.assertIsNotNone(soup.find("li", class_="success"))
 
 
 class MiddlewareChecksTest(TestCase):
-  @override_settings(MIDDLEWARE=[
-    'django_htmx_cbv.middleware.HtmxPartialTemplateMiddleware',
-  ])
+  @override_settings(
+    MIDDLEWARE=[
+      "django_htmx_cbv.middleware.HtmxPartialTemplateMiddleware",
+    ]
+  )
   def test_missing_htmx_middleware_check(self) -> None:
     errors = run_checks()
-    self.assertTrue(
-      any(error.id == 'django_htmx_cbv.E001' for error in errors)
-    )
+    self.assertTrue(any(error.id == "django_htmx_cbv.E001" for error in errors))
 
-  @override_settings(MIDDLEWARE=[
-    'django_htmx_cbv.middleware.HtmxPartialTemplateMiddleware',
-    'django_htmx.middleware.HtmxMiddleware',
-  ])
+  @override_settings(
+    MIDDLEWARE=[
+      "django_htmx_cbv.middleware.HtmxPartialTemplateMiddleware",
+      "django_htmx.middleware.HtmxMiddleware",
+    ]
+  )
   def test_misordered_htmx_middleware_check(self) -> None:
     errors = run_checks()
-    self.assertTrue(
-      any(error.id == 'django_htmx_cbv.E002' for error in errors)
-    )
+    self.assertTrue(any(error.id == "django_htmx_cbv.E002" for error in errors))
